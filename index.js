@@ -21,12 +21,35 @@ async function sendToGroup(text) {
   }
 }
 
-// Command
+// Command (MANUAL)
 bot.command("get", async (ctx) => {
   const data = await fetchData();
   await sendToGroup("📡 Panel Data:\n\n" + data);
   ctx.reply("✅ Sent to group");
 });
+
+/* =========================
+   🔥 AUTO SYSTEM ADDED
+   ========================= */
+
+let lastData = "";
+
+async function autoFetch() {
+  const data = await fetchData();
+
+  // prevent duplicate send
+  if (data && data !== lastData && data !== "❌ Error fetching data") {
+    lastData = data;
+
+    await sendToGroup("📡 Panel Auto Update:\n\n" + data);
+    console.log("Auto sent to group");
+  }
+}
+
+// every 60 seconds check panel
+setInterval(autoFetch, 60000);
+
+/* ========================= */
 
 bot.launch();
 
