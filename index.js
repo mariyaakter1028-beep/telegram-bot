@@ -1,89 +1,90 @@
 import { Telegraf } from "telegraf";
-import puppeteer from "puppeteer";
-import { BOT_TOKEN, CHAT_IDS, ALL_NUMBER_URL } from "./config.js";
+import fs from "fs";
+import { BOT_TOKEN, CHAT_IDS } from "./config.js";
 
 const bot = new Telegraf(BOT_TOKEN);
 
-/* =========================
-   📡 FETCH AUDIO / DATA
-   ========================= */
+const USERS_FILE = "./users.json";
 
-async function fetchAudio() {
+// Load users
+function loadUsers() {
   try {
-    const browser = await puppeteer.launch({
-      args: ["--no-sandbox", "--disable-setuid-sandbox"]
-    });
-
-    const page = await browser.newPage();
-    await page.goto(ALL_NUMBER_URL, { waitUntil: "networkidle2" });
-
-    // try to find audio/mp3 link in page
-    const audioUrl = await page.evaluate(() => {
-      const audio = document.querySelector("audio");
-      if (audio && audio.src) return audio.src;
-
-      // fallback: search mp3 in page
-      const match = document.body.innerHTML.match(/https?:\/\/[^\\s"]+\\.mp3/);
-      return match ? match[0] : null;
-    });
-
-    await browser.close();
-
-    return audioUrl;
-
+    if (!fs.existsSync(USERS_FILE)) return [];
+    const data = fs.readFileSync(USERS_FILE, "utf8");
+    return JSON.parse(data);
   } catch (err) {
-    return null;
+    return [];
   }
 }
 
-/* =========================
-   📤 SEND AUDIO TO GROUP
-   ========================= */
+// Save users
+function saveUsers(users) {
+  fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
+}
 
-async function sendAudioToGroup(url) {
+// Add user to list
+function addUser(userId) {
+  const users = loadUsers();
+  if (!users.includes(userId)) {
+    users.push(userId);
+    saveUsers(users);
+  }
+}
+
+// Send message to group
+async function sendToGroup(text) {
   for (let id of CHAT_IDS) {
-    await bot.telegram.sendAudio(id, url);
+    await bot.telegram.sendMessage(id, text);
+  }
+}
+
+// Send message to all users
+async function sendToAllUsers(text) {
+  const users = loadUsers();
+  for (let userId of users) {
+    try {
+      await bot.telegram.sendMessage(userId, text);
+    } catch (err) {
+      console.log("Failed to send user:", userId);
+    }
   }
 }
 
 /* =========================
-   🟢 MANUAL COMMAND
+   START COMMAND
    ========================= */
 
-bot.command("get", async (ctx) => {
-  const audio = await fetchAudio();
-
-  if (audio) {
-    await sendAudioToGroup(audio);
-    ctx.reply("✅ Audio sent to group");
-  } else {
-    ctx.reply("❌ No audio found");
-  }
+bot.start((ctx) => {
+  addUser(ctx.chat.id);
+  ctx.reply("✅ You have started the bot. Now you will receive broadcast messages.");
 });
 
 /* =========================
-   🔥 AUTO SYSTEM
+   BOARDCHAT COMMAND
    ========================= */
 
-let lastAudio = "";
+let waitingForMessage = {};
 
-async function autoFetch() {
-  const audio = await fetchAudio();
+bot.command("Boardchat", async (ctx) => {
+  waitingForMessage[ctx.chat.id] = true;
+  ctx.reply("✍️ এখন মেসেজ লিখুন, আমি সেটা গ্রুপ এবং সকল ইউজারকে পাঠিয়ে দিবো।");
+});
 
-  if (audio && audio !== lastAudio) {
-    lastAudio = audio;
+// When user sends message after Boardchat
+bot.on("text", async (ctx) => {
+  const userId = ctx.chat.id;
 
-    for (let id of CHAT_IDS) {
-      await bot.telegram.sendAudio(id, audio);
-    }
+  if (waitingForMessage[userId]) {
+    waitingForMessage[userId] = false;
 
-    console.log("🎧 Auto audio sent");
+    const msg = ctx.message.text;
+
+    await sendToGroup("📢 Board Message:\n\n" + msg);
+    await sendToAllUsers("📢 Board Message:\n\n" + msg);
+
+    ctx.reply("✅ Message sent to Group + All Users");
   }
-}
-
-setInterval(autoFetch, 60000);
-
-/* ========================= */
+});
 
 bot.launch();
 console.log("Bot running...");
