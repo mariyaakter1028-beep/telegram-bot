@@ -6,46 +6,48 @@ const bot = new Telegraf(BOT_TOKEN);
 
 const USERS_FILE = "./users.json";
 
-// Load users
+/* =========================
+   USERS SYSTEM
+   ========================= */
+
 function loadUsers() {
   try {
     if (!fs.existsSync(USERS_FILE)) return [];
-    const data = fs.readFileSync(USERS_FILE, "utf8");
-    return JSON.parse(data);
-  } catch (err) {
+    return JSON.parse(fs.readFileSync(USERS_FILE, "utf8"));
+  } catch {
     return [];
   }
 }
 
-// Save users
 function saveUsers(users) {
   fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
 }
 
-// Add user to list
-function addUser(userId) {
+function addUser(id) {
   const users = loadUsers();
-  if (!users.includes(userId)) {
-    users.push(userId);
+  if (!users.includes(id)) {
+    users.push(id);
     saveUsers(users);
   }
 }
 
-// Send message to group
+/* =========================
+   SEND FUNCTIONS
+   ========================= */
+
 async function sendToGroup(text) {
   for (let id of CHAT_IDS) {
     await bot.telegram.sendMessage(id, text);
   }
 }
 
-// Send message to all users
 async function sendToAllUsers(text) {
   const users = loadUsers();
-  for (let userId of users) {
+  for (let id of users) {
     try {
-      await bot.telegram.sendMessage(userId, text);
-    } catch (err) {
-      console.log("Failed to send user:", userId);
+      await bot.telegram.sendMessage(id, text);
+    } catch (e) {
+      console.log("Failed user:", id);
     }
   }
 }
@@ -56,35 +58,38 @@ async function sendToAllUsers(text) {
 
 bot.start((ctx) => {
   addUser(ctx.chat.id);
-  ctx.reply("✅ You have started the bot. Now you will receive broadcast messages.");
+  ctx.reply("✅ Bot started. You will receive messages.");
 });
 
 /* =========================
-   BOARDCHAT COMMAND
+   BOARDCHAT ONLY
    ========================= */
 
-let waitingForMessage = {};
+let waiting = {};
 
-bot.command("Boardchat", async (ctx) => {
-  waitingForMessage[ctx.chat.id] = true;
-  ctx.reply("✍️ এখন মেসেজ লিখুন, আমি সেটা গ্রুপ এবং সকল ইউজারকে পাঠিয়ে দিবো।");
+bot.command("boardchat", async (ctx) => {
+  waiting[ctx.chat.id] = true;
+  ctx.reply("✍️ এখন মেসেজ লিখো (Group + All Users এ যাবে)");
 });
 
-// When user sends message after Boardchat
 bot.on("text", async (ctx) => {
-  const userId = ctx.chat.id;
+  const id = ctx.chat.id;
 
-  if (waitingForMessage[userId]) {
-    waitingForMessage[userId] = false;
+  if (waiting[id]) {
+    waiting[id] = false;
 
     const msg = ctx.message.text;
 
     await sendToGroup("📢 Board Message:\n\n" + msg);
     await sendToAllUsers("📢 Board Message:\n\n" + msg);
 
-    ctx.reply("✅ Message sent to Group + All Users");
+    ctx.reply("✅ Sent to Group + Users");
   }
 });
+
+/* =========================
+   BOT START
+   ========================= */
 
 bot.launch();
 console.log("Bot running...");
