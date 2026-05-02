@@ -4,12 +4,12 @@ import { BOT_TOKEN, CHAT_IDS, ADMIN_ID } from "./config.js";
 
 const bot = new Telegraf(BOT_TOKEN);
 
+/* =========================
+   FILE SYSTEM
+   ========================= */
+
 const USERS_FILE = "./users.json";
 const BLOCK_FILE = "./blocked.json";
-
-/* =========================
-   HELPERS
-   ========================= */
 
 function read(file, def) {
   try {
@@ -25,7 +25,7 @@ function write(file, data) {
 }
 
 /* =========================
-   USERS SYSTEM
+   USER SYSTEM
    ========================= */
 
 function addUser(id) {
@@ -39,6 +39,20 @@ function addUser(id) {
 function isBlocked(id) {
   const blocked = read(BLOCK_FILE, []);
   return blocked.includes(id);
+}
+
+/* =========================
+   ADMIN CHECK
+   ========================= */
+
+function isAdmin(id) {
+  return id == ADMIN_ID;
+}
+
+function deny(ctx) {
+  ctx.reply(
+    "❌ Access Denied 🚫\n\n👑 This command is only for Admin"
+  );
 }
 
 /* =========================
@@ -65,7 +79,7 @@ async function sendToUsers(text) {
 }
 
 /* =========================
-   START MESSAGE
+   START COMMAND
    ========================= */
 
 bot.start((ctx) => {
@@ -73,16 +87,34 @@ bot.start((ctx) => {
 
   const username = ctx.from.username
     ? `@${ctx.from.username}`
-    : "User";
+    : ctx.from.first_name || "User";
 
-  ctx.reply(`🌸 Welcome ${username} to Smart Support Bot 🤖`);
+  ctx.reply(`
+🌸 Assalamu Alaikum 𝗦𝗺𝗮𝗿𝘁 𝗠𝗲𝘁𝗵𝗼𝗱 (${username}) 🌸  
+
+🤖✨ Welcome to Smart Method Live Support Bot  
+
+Now you can contact our live support anytime.  
+
+📝 Write your question here,  
+our support team will reply soon InshaAllah.  
+━━━━━━━━━━━━━━━  
+
+📌 Official Channel:  
+👉 @Global_Method_Channel  
+━━━━━━━━━━━━━━━  
+
+❤️ Thank you for being with Smart Method Family
+`);
 });
 
 /* =========================
-   PANEL (PUBLIC)
+   PANEL (ADMIN ONLY)
    ========================= */
 
 bot.command("panel", (ctx) => {
+  if (!isAdmin(ctx.chat.id)) return deny(ctx);
+
   ctx.reply("🚀 Coming Soon Panel 🔥");
 });
 
@@ -93,10 +125,10 @@ bot.command("panel", (ctx) => {
 let waiting = {};
 
 bot.command("boardchat", (ctx) => {
-  if (ctx.chat.id != ADMIN_ID) return;
+  if (!isAdmin(ctx.chat.id)) return deny(ctx);
 
   waiting[ctx.chat.id] = "boardchat";
-  ctx.reply("✍️ Send message for broadcast");
+  ctx.reply("✍️ Send broadcast message");
 });
 
 /* =========================
@@ -104,7 +136,7 @@ bot.command("boardchat", (ctx) => {
    ========================= */
 
 bot.command("block", (ctx) => {
-  if (ctx.chat.id != ADMIN_ID) return;
+  if (!isAdmin(ctx.chat.id)) return deny(ctx);
 
   const username = ctx.message.text.split(" ")[1];
   if (!username) return ctx.reply("Usage: /block username");
@@ -117,7 +149,7 @@ bot.command("block", (ctx) => {
 });
 
 bot.command("unblock", (ctx) => {
-  if (ctx.chat.id != ADMIN_ID) return;
+  if (!isAdmin(ctx.chat.id)) return deny(ctx);
 
   const username = ctx.message.text.split(" ")[1];
   if (!username) return ctx.reply("Usage: /unblock username");
@@ -146,7 +178,7 @@ bot.on("text", async (ctx) => {
     await sendToGroup("📢 Board Message:\n\n" + msg);
     await sendToUsers("📢 Board Message:\n\n" + msg);
 
-    ctx.reply("✅ Sent");
+    ctx.reply("✅ Sent successfully");
   }
 });
 
@@ -157,10 +189,11 @@ bot.on("text", async (ctx) => {
 const randomMessages = [
   "📢 Stay connected with Smart Method 🔥",
   "🚀 New update coming soon...",
-  "💡 Learn & grow with us daily",
-  "📡 System is running smoothly ✅",
-  "⚡ Smart Method Live Support Active",
-  "🔥 Don't miss new features update"
+  "💡 Learn something new daily",
+  "📡 System running smoothly ✅",
+  "⚡ Smart Method Live Support ON",
+  "🔥 Don’t miss updates",
+  "🤖 Auto system active"
 ];
 
 async function autoSend() {
@@ -168,10 +201,10 @@ async function autoSend() {
     randomMessages[Math.floor(Math.random() * randomMessages.length)];
 
   await sendToGroup(msg);
-  console.log("Auto message sent:", msg);
+  console.log("Auto sent:", msg);
 }
 
-setInterval(autoSend, 120000); // 2 minutes
+setInterval(autoSend, 120000);
 
 /* ========================= */
 
